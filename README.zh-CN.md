@@ -9,9 +9,8 @@
 DSH 图片附件 -> 视觉模型描述 -> deepseek-official
 ```
 
-插件会新增独立的 `deepseek-vision` 提供方。它复用 DSH 的持久附件与凭据
-服务，使用 `mcp-vision-bridge` 调用兼容 OpenAI 协议的视觉模型，再把完整
-对话交给官方 DeepSeek 适配器处理推理、流式输出、工具调用、重试和模型配置。
+插件会新增独立的 `deepseek-vision` 路由。图片分析通过 DSH“模型”设置中已有的
+提供方运行；主对话仍由官方 DeepSeek 适配器负责推理、流式输出、工具调用和重试。
 
 ## 兼容性
 
@@ -27,29 +26,21 @@ DSH 图片附件 -> 视觉模型描述 -> deepseek-official
 dsh plugin --profile web add github:mochgolf/dsh-deepseek-vision-router
 ```
 
-首次启动 DSH 后，通过其持久凭据服务录入一次视觉模型密钥：
+1. 打开 **设置 → 模型**，新增或复用一个支持图片输入的提供方；端点和凭据仍由
+   模型页管理。
+2. 打开 **设置 → 插件 → DeepSeek 视觉**，选择该提供方并保存视觉模型。模型字段
+   默认是 `mimo-v2.5`，也可输入所选提供方支持的其他模型 ID。
 
-```sh
-dsh --profile web --host 127.0.0.1 --port 3080
-read -rsp '视觉模型 API Key: ' key; echo
-printf %s "$key" | dsh plugin --profile web exec dsh-vision-key
-unset key
-```
-
-该命令会把 `VISION_OPENAI_API_KEY` 写入 DSH 管理的凭据库，而不是插件配置。
-以后启动无需再传环境变量。若 DSH 使用其他回环地址，请把地址作为命令的最后一个
-参数；同名启动环境变量仍可作为无头部署的后备方案。
-
-插件默认使用 OpenCode Go 的 `mimo-v2.5`。如需接入其他兼容 OpenAI 协议的
-视觉端点，可在插件的 Cordis 配置项中覆盖 `visionBaseURL`、`visionModel`、
-`visionApiKeyEnv`、`visionMaxTokens` 或 `visionTimeoutMs`。
+提供方的新增、修改和删除始终在 **设置 → 模型** 完成。插件只在 DSH 原生 settings
+命名空间保存 `visionProvider` 和 `visionModel`，下一次图片请求会直接使用新配置，
+无需重启。
 
 在 DSH 模型菜单中选择 **DeepSeek + Vision**。新会话可以将它设为默认提供方；
 已有会话会保留之前记录的提供方，直到手动切换。
 
 ## 安全与隐私
 
-- 凭据按引用解析、由 DSH 持久化，不会保存在插件配置中。
+- 提供方端点和凭据仍由 DSH“模型”设置管理；插件不会复制或保存它们。
 - 图片字节会发送到配置的视觉模型提供方；DeepSeek 接收的是文字描述，而非像素。
 - 视觉描述在交给 DeepSeek 前会标记为不可信图片内容，避免图片中的文字被提升为
   系统指令。
@@ -58,7 +49,7 @@ unset key
 ## 已知限制
 
 - DSH 重启后不会保留描述缓存。
-- 当前实现引用了两个 `mcp-vision-bridge` 内部模块；其上游目录结构变化时可能需要
+- 分析提示词来自一个 `mcp-vision-bridge` 内部模块；其上游目录结构变化时可能需要
   更新兼容代码。
 - 这是图片预处理桥接方案，不是 DeepSeek 原生多模态能力。
 

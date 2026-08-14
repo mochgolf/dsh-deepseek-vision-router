@@ -10,10 +10,9 @@ the DSH chat composer.
 DSH image attachment -> vision model description -> deepseek-official
 ```
 
-The plugin adds a separate `deepseek-vision` provider. It reuses DSH's durable
-attachment and credential services, `mcp-vision-bridge` for OpenAI-compatible
-vision calls, and the official DeepSeek adapter for reasoning, streaming, tool
-calls, retries, and model configuration.
+The plugin adds a separate `deepseek-vision` route. Image analysis runs through
+an existing provider from DSH's Models settings; the official DeepSeek adapter
+still owns the main conversation, reasoning, streaming, tools, and retries.
 
 ## Compatibility
 
@@ -29,25 +28,15 @@ Other versions may work but have not been tested.
 dsh plugin --profile web add github:mochgolf/dsh-deepseek-vision-router
 ```
 
-Start DSH once, then store the vision credential through DSH's persistent
-credential service:
+1. Open **Settings → Models** and add or reuse an image-capable provider. Its
+   endpoint and credential stay owned by the Models page.
+2. Open **Settings → Plugins → DeepSeek Vision**, select that provider, and
+   save the vision model. The model field defaults to `mimo-v2.5` but accepts
+   any model ID exposed by the selected provider.
 
-```sh
-dsh --profile web --host 127.0.0.1 --port 3080
-read -rsp 'Vision API key: ' key; echo
-printf %s "$key" | dsh plugin --profile web exec dsh-vision-key
-unset key
-```
-
-This writes `VISION_OPENAI_API_KEY` to DSH's managed credential store, not the
-plugin config. Later launches need no environment variable. If DSH uses a
-different loopback URL, pass it as the command's final argument. A launch
-environment value with the same name remains available for headless deployments.
-
-The bundled defaults use OpenCode Go with `mimo-v2.5`. Override
-`visionBaseURL`, `visionModel`, `visionApiKeyEnv`, `visionMaxTokens`, or
-`visionTimeoutMs` in the plugin's Cordis entry when using another
-OpenAI-compatible vision endpoint.
+Provider additions, edits, and removals remain in **Settings → Models**. The
+plugin stores only `visionProvider` and `visionModel` in DSH's native settings
+namespace and applies changes to the next image request without a restart.
 
 Select **DeepSeek + Vision** in DSH's model menu. New sessions can use it as
 their default provider; existing sessions retain their recorded provider until
@@ -55,8 +44,8 @@ switched.
 
 ## Security and privacy
 
-- Credentials are resolved by reference, persisted by DSH, and never stored in
-  plugin config.
+- Provider endpoints and credentials remain managed by DSH's Models settings;
+  this plugin never copies or stores them.
 - Image bytes are sent to the configured vision provider; DeepSeek receives the
   resulting text description, not the pixels.
 - Descriptions are marked as untrusted image content before reaching DeepSeek,
@@ -66,8 +55,8 @@ switched.
 ## Limitations
 
 - The cache is not persisted across DSH restarts.
-- The current implementation imports two `mcp-vision-bridge` internal modules;
-  an upstream directory change may require a compatibility update.
+- The analysis prompt comes from an internal `mcp-vision-bridge` module; an
+  upstream directory change may require a compatibility update.
 - This is a preprocessing bridge, not native DeepSeek multimodality.
 
 ## Development
