@@ -29,8 +29,11 @@ Other versions may work but have not been tested.
 dsh plugin --profile web add github:mochgolf/dsh-deepseek-vision-router
 ```
 
-Start DSH once, then store the vision credential through DSH's persistent
-credential service:
+Open **Settings → Plugins → DeepSeek Vision** and store the vision credential.
+DSH persists it in its managed credential store, and later launches need no
+environment variable.
+
+For a headless setup, start DSH once and use the bundled command:
 
 ```sh
 dsh --profile web --host 127.0.0.1 --port 3080
@@ -40,9 +43,9 @@ unset key
 ```
 
 This writes `VISION_OPENAI_API_KEY` to DSH's managed credential store, not the
-plugin config. Later launches need no environment variable. If DSH uses a
-different loopback URL, pass it as the command's final argument. A launch
-environment value with the same name remains available for headless deployments.
+plugin config. If DSH uses a different loopback URL, pass it as the command's
+final argument. A launch environment value with the same name remains available
+as a read-only deployment override.
 
 The bundled defaults use OpenCode Go with `mimo-v2.5`. Override
 `visionBaseURL`, `visionModel`, `visionApiKeyEnv`, `visionMaxTokens`, or

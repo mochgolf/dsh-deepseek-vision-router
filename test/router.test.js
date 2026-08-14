@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import test from 'node:test'
+import vm from 'node:vm'
 import { DeepSeekVisionRouter, resolveConfig } from '../index.js'
 
 test('images are described once and delegated to the official DeepSeek route', async () => {
@@ -117,4 +119,39 @@ test('credential CLI stores a piped key without printing it', async (t) => {
   assert.equal(request.method, 'credentials.set')
   assert.deepEqual(request.payload, { ref: 'VISION_OPENAI_API_KEY', value: 'test-secret' })
   assert.doesNotMatch(output, /test-secret/)
+})
+
+test('client bundle registers the native credential card', async () => {
+  let definition
+  const document = {
+    head: { appendChild() {} },
+    querySelector() { return null },
+    createElement() { return { dataset: {}, remove() {} } },
+  }
+  vm.runInNewContext(await readFile(new URL('../client.js', import.meta.url), 'utf8'), {
+    document,
+    window: { __ModuleLoader__: { load(value) { definition = value } } },
+  })
+
+  const plugin = definition.factory((name) => {
+    assert.equal(name, 'react')
+    return { createElement() {} }
+  })
+  let registration
+  const services = {
+    slots: {
+      inject(name, effect) { assert.equal(name, 'settings.plugin.item'); effect() },
+      register(options, component) { registration = { options, component } },
+    },
+    connection: { api: {} },
+    locale: {},
+    remote: { $on() { return () => {} } },
+  }
+  plugin.apply({
+    effect(callback) { callback() },
+    get(name) { return services[name] },
+  })
+
+  assert.equal(registration.options.id, 'deepseek-vision')
+  assert.equal(typeof registration.component, 'function')
 })
