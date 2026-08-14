@@ -3,42 +3,43 @@ window.__ModuleLoader__.load({
   factory: (require) => {
     const React = require('react')
     const h = React.createElement
-    const REF = 'VISION_OPENAI_API_KEY'
+    const NS = 'deepseek-vision-router'
+    const RPC_CHANNEL = '/dsh-vision-router'
+    const ROUTER = 'deepseek-vision'
+    const DEFAULT_MODEL = 'mimo-v2.5'
 
     const COPY = {
       zh: {
         title: 'DeepSeek 视觉',
-        description: '管理视觉模型使用的 API Key',
-        key: 'API Key',
-        hint: '密钥由 DSH 凭据服务保存；留空不会覆盖现有密钥。',
-        configured: '已配置',
-        unconfigured: '未配置',
-        loading: '正在读取凭据状态…',
-        save: '保存密钥',
+        description: '选择用于图片分析的模型提供方',
+        provider: '视觉提供方',
+        providerPlaceholder: '请选择提供方',
+        providerHint: '提供方、端点和密钥请在“设置 → 模型”中新增、修改或删除。',
+        model: '视觉模型',
+        modelHint: '默认使用 MiMo；也可输入所选提供方支持的其他模型 ID。',
+        loading: '正在读取配置…',
+        unconfigured: '未选择提供方',
+        unavailable: '已不可用',
+        readOnly: '当前设置存储为只读，无法保存修改。',
+        save: '保存',
         saving: '保存中…',
-        remove: '删除密钥',
-        saved: '密钥已保存，下一次请求立即生效。',
-        removed: '密钥已删除。',
-        confirmRemove: '确定删除视觉模型 API Key？',
-        readOnly: '当前密钥来自启动环境，只读；请先移除对应环境变量并重启 DSH。',
-        sources: { file: 'DSH 凭据库', env: '启动环境', 'project-env': '项目 .env', 'user-env': '用户 .env' },
+        saved: '视觉提供方和模型已保存，下一次图片请求立即生效。',
       },
       en: {
         title: 'DeepSeek Vision',
-        description: 'Manage the API key used by the vision model',
-        key: 'API key',
-        hint: 'Stored by DSH credentials; leaving this blank keeps the existing key.',
-        configured: 'Configured',
-        unconfigured: 'Not configured',
-        loading: 'Reading credential status…',
-        save: 'Save key',
+        description: 'Select the model provider used for image analysis',
+        provider: 'Vision provider',
+        providerPlaceholder: 'Select a provider',
+        providerHint: 'Add, edit, or remove providers, endpoints, and credentials in Settings → Models.',
+        model: 'Vision model',
+        modelHint: 'MiMo is the default; you may enter another model ID supported by the selected provider.',
+        loading: 'Reading configuration…',
+        unconfigured: 'No provider selected',
+        unavailable: 'unavailable',
+        readOnly: 'The settings store is read-only, so changes cannot be saved.',
+        save: 'Save',
         saving: 'Saving…',
-        remove: 'Remove key',
-        saved: 'Key saved and available to the next request.',
-        removed: 'Key removed.',
-        confirmRemove: 'Remove the vision model API key?',
-        readOnly: 'The active key comes from the launch environment. Remove that variable and restart DSH to edit it here.',
-        sources: { file: 'DSH credential store', env: 'launch environment', 'project-env': 'project .env', 'user-env': 'user .env' },
+        saved: 'Vision provider and model saved for the next image request.',
       },
     }
 
@@ -55,8 +56,7 @@ window.__ModuleLoader__.load({
 .dvr-label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary)}
 .dvr-input{box-sizing:border-box;width:100%;height:34px;padding:0 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}
 .dvr-input:disabled{opacity:.55}.dvr-message{margin:0;font-size:12px;color:var(--dsw-alias-state-success-primary)}.dvr-error{margin:0;font-size:12px;color:var(--dsw-alias-state-error-primary)}
-.dvr-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}.dvr-button{border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:5px 14px;background:none;color:var(--dsw-alias-label-secondary);font:inherit;font-size:13px;cursor:pointer}
-.dvr-button-primary{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-3);border-color:transparent}.dvr-button-danger{color:var(--dsw-alias-state-error-primary)}
+.dvr-actions{display:flex;justify-content:flex-end;padding-top:4px}.dvr-button{border:1px solid transparent;border-radius:8px;padding:5px 14px;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-3);font:inherit;font-size:13px;cursor:pointer}
 .dvr-button:disabled{opacity:.4;cursor:default}
 `
 
@@ -75,7 +75,8 @@ window.__ModuleLoader__.load({
         h('path', { d: 'm3 5 4 4 4-4' }))
     }
 
-    function CredentialCard({ api, locale, subscribeCredential }) {
+    function SelectionCard({ connection, locale, subscribeConfig }) {
+      const api = connection.api
       const localeSnapshot = React.useSyncExternalStore(
         locale.subscribe.bind(locale),
         locale.getSnapshot.bind(locale),
@@ -83,36 +84,54 @@ window.__ModuleLoader__.load({
       )
       const copy = localeSnapshot.active.toLowerCase().startsWith('zh') ? COPY.zh : COPY.en
       const [expanded, setExpanded] = React.useState(false)
-      const [info, setInfo] = React.useState()
-      const [key, setKey] = React.useState('')
+      const [view, setView] = React.useState()
+      const [groups, setGroups] = React.useState([])
+      const [provider, setProvider] = React.useState('')
+      const [model, setModel] = React.useState(DEFAULT_MODEL)
       const [busy, setBusy] = React.useState(false)
       const [message, setMessage] = React.useState('')
       const [error, setError] = React.useState('')
 
       const load = React.useCallback(async () => {
         try {
-          const response = await api.credentials.describe({ refs: [REF] })
-          if (!response.result.ok) throw new Error(response.result.error.message)
-          setInfo(response.result.value.credentials[REF] ?? { configured: false, writable: true })
+          const [settingsResult, modelsResponse] = await Promise.all([
+            connection.rpc.call(RPC_CHANNEL, 'settings.get', {}),
+            api.llm.models({}),
+          ])
+          if (!settingsResult.ok) throw new Error(settingsResult.error.message)
+          if (!modelsResponse.result.ok) throw new Error(modelsResponse.result.error.message)
+          const value = settingsResult.value ?? {}
+          const nextProvider = typeof value.visionProvider === 'string' ? value.visionProvider : ''
+          const nextModel = typeof value.visionModel === 'string' ? value.visionModel : DEFAULT_MODEL
+          setView({ writable: value.writable !== false, value: { visionProvider: nextProvider, visionModel: nextModel } })
+          setGroups(modelsResponse.result.value.groups.filter((group) => group.id !== ROUTER))
+          setProvider(nextProvider)
+          setModel(nextModel)
+          setError('')
         } catch (reason) {
           setError(reason instanceof Error ? reason.message : String(reason))
         }
-      }, [api])
+      }, [api, connection])
 
       React.useEffect(() => {
         void load()
-        return subscribeCredential(() => { void load() })
-      }, [load, subscribeCredential])
+        return subscribeConfig(() => { void load() })
+      }, [load, subscribeConfig])
 
       const save = async () => {
-        const value = key.trim()
-        if (value === '') return
+        const nextProvider = provider.trim()
+        const nextModel = model.trim()
+        if (nextProvider === '' || nextModel === '' || view === undefined) return
         setBusy(true); setMessage(''); setError('')
         try {
-          const response = await api.credentials.set({ ref: REF, value })
-          if (!response.result.ok) throw new Error(response.result.error.message)
-          setKey('')
-          await load()
+          const result = await connection.rpc.call(RPC_CHANNEL, 'settings.set', {
+            visionProvider: nextProvider,
+            visionModel: nextModel,
+          })
+          if (!result.ok) throw new Error(result.error.message)
+          setView({ writable: result.value.writable !== false, value: { visionProvider: result.value.visionProvider, visionModel: result.value.visionModel } })
+          setProvider(nextProvider)
+          setModel(nextModel)
           setMessage(copy.saved)
         } catch (reason) {
           setError(reason instanceof Error ? reason.message : String(reason))
@@ -121,53 +140,50 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const remove = async () => {
-        if (!globalThis.confirm(copy.confirmRemove)) return
-        setBusy(true); setMessage(''); setError('')
-        try {
-          const response = await api.credentials.unset({ ref: REF })
-          if (!response.result.ok) throw new Error(response.result.error.message)
-          setKey('')
-          await load()
-          setMessage(copy.removed)
-        } catch (reason) {
-          setError(reason instanceof Error ? reason.message : String(reason))
-        } finally {
-          setBusy(false)
-        }
-      }
-
-      const source = info?.source === undefined ? '' : (copy.sources[info.source] ?? info.source)
-      const status = info === undefined
-        ? copy.loading
-        : info.configured ? `${copy.configured}${source === '' ? '' : ` · ${source}`}` : copy.unconfigured
-      const locked = info?.writable === false
+      const savedProvider = view?.value.visionProvider ?? ''
+      const savedModel = view?.value.visionModel ?? DEFAULT_MODEL
+      const savedGroup = groups.find((group) => group.id === savedProvider)
+      const unavailable = savedProvider !== '' && savedGroup === undefined
+      const status = view === undefined ? copy.loading
+        : savedProvider === '' ? copy.unconfigured
+          : `${savedGroup?.name ?? savedProvider}${unavailable ? ` (${copy.unavailable})` : ''} · ${savedModel}`
+      const selectedGroup = groups.find((group) => group.id === provider)
+      const dirty = view !== undefined && (provider.trim() !== savedProvider || model.trim() !== savedModel)
 
       return h('li', { className: 'dvr-card', 'data-open': expanded || undefined },
         h('button', { type: 'button', className: 'dvr-head', 'aria-expanded': expanded, onClick: () => setExpanded(value => !value) },
           h('span', { className: 'dvr-headText' },
             h('span', { className: 'dvr-title' }, copy.title),
             h('span', { className: 'dvr-description' }, copy.description)),
-          h('span', { className: 'dvr-status', 'data-configured': info?.configured || undefined }, status),
+          h('span', { className: 'dvr-status', 'data-configured': savedProvider !== '' || undefined }, status),
           h('span', { className: 'dvr-chevron', 'data-open': expanded || undefined }, h(Chevron))),
         !expanded ? null : h('div', { className: 'dvr-body' },
-          locked ? h('p', { className: 'dvr-readonly', role: 'status' }, copy.readOnly) : null,
-          h('label', { className: 'dvr-label', htmlFor: 'dvr-api-key' }, copy.key),
+          view?.writable === false ? h('p', { className: 'dvr-readonly', role: 'status' }, copy.readOnly) : null,
+          h('label', { className: 'dvr-label', htmlFor: 'dvr-provider' }, copy.provider),
+          h('select', {
+            id: 'dvr-provider', className: 'dvr-input', value: provider, disabled: busy || view?.writable === false,
+            onChange: event => { setProvider(event.target.value); setMessage('') },
+          },
+          h('option', { value: '' }, copy.providerPlaceholder),
+          unavailable ? h('option', { value: savedProvider }, `${savedProvider} (${copy.unavailable})`) : null,
+          ...groups.map((group) => h('option', { key: group.id, value: group.id }, group.name === group.id ? group.id : `${group.name} (${group.id})`))),
+          h('p', { className: 'dvr-hint' }, copy.providerHint),
+          h('label', { className: 'dvr-label', htmlFor: 'dvr-model' }, copy.model),
           h('input', {
-            id: 'dvr-api-key', className: 'dvr-input', type: 'password', autoComplete: 'off',
-            value: key, disabled: locked || busy, onChange: event => setKey(event.target.value),
+            id: 'dvr-model', className: 'dvr-input', list: 'dvr-model-list', value: model,
+            disabled: busy || view?.writable === false,
+            onChange: event => { setModel(event.target.value); setMessage('') },
           }),
-          h('p', { className: 'dvr-hint' }, copy.hint),
+          h('datalist', { id: 'dvr-model-list' },
+            ...(selectedGroup?.models ?? []).map((entry) => h('option', { key: entry.id, value: entry.id, label: entry.name }))),
+          h('p', { className: 'dvr-hint' }, copy.modelHint),
           message === '' ? null : h('p', { className: 'dvr-message', role: 'status' }, message),
           error === '' ? null : h('p', { className: 'dvr-error', role: 'alert' }, error),
           h('div', { className: 'dvr-actions' },
             h('button', {
-              type: 'button', className: 'dvr-button dvr-button-danger',
-              disabled: busy || locked || info?.configured !== true, onClick: () => { void remove() },
-            }, copy.remove),
-            h('button', {
-              type: 'button', className: 'dvr-button dvr-button-primary',
-              disabled: busy || locked || key.trim() === '', onClick: () => { void save() },
+              type: 'button', className: 'dvr-button',
+              disabled: busy || view?.writable === false || provider.trim() === '' || model.trim() === '' || !dirty,
+              onClick: () => { void save() },
             }, busy ? copy.saving : copy.save))))
     }
 
@@ -178,16 +194,21 @@ window.__ModuleLoader__.load({
       const remote = ctx.get('remote')
       if (slots === undefined || connection === undefined || locale === undefined || remote === undefined) return
 
-      ctx.effect(installStyles, 'dsh-deepseek-vision-router: credential card styles')
+      ctx.effect(installStyles, 'dsh-deepseek-vision-router: selection card styles')
       const listeners = new Set()
-      const subscribeCredential = listener => { listeners.add(listener); return () => listeners.delete(listener) }
-      ctx.effect(() => remote.$on('credentials/updated', ref => {
-        if (ref === REF) for (const listener of listeners) listener()
-      }), 'dsh-deepseek-vision-router: credential updates')
+      const subscribeConfig = listener => { listeners.add(listener); return () => listeners.delete(listener) }
+      const notify = () => { for (const listener of listeners) listener() }
+      ctx.effect(() => {
+        const disposers = [
+          remote.$on('settings/document-updated', ns => { if (ns === NS) notify() }),
+          remote.$on('llm/adapters-updated', notify),
+        ]
+        return () => { for (const dispose of disposers) dispose() }
+      }, 'dsh-deepseek-vision-router: selection updates')
       slots.inject('settings.plugin.item', () => slots.register({
         name: 'settings.plugin.item', id: 'deepseek-vision', order: 25,
-        inject: () => ({ api: connection.api, locale, subscribeCredential }),
-      }, CredentialCard))
+        inject: () => ({ connection, locale, subscribeConfig }),
+      }, SelectionCard))
     }
 
     return { apply }

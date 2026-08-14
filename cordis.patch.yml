@@ -5,8 +5,7 @@
       config:
         provider: deepseek-vision
         targetProvider: deepseek-official
-        visionBaseURL: 'https://opencode.ai/zen/go/v1'
+        # Select an active route from Settings > Models in the web card.
+        visionProvider: ''
         visionModel: 'mimo-v2.5'
-        visionApiKeyEnv: VISION_OPENAI_API_KEY
         visionMaxTokens: 4096
-        visionTimeoutMs: 120000
