@@ -24,10 +24,15 @@
     ".": "./index.js",
     "./package.json": "./package.json"
   },
+  "bin": {
+    "dsh-vision-key": "./bin/dsh-vision-key.js"
+  },
   "files": [
+    "bin/dsh-vision-key.js",
     "index.js",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md"
   ],
   "dsh": {
     "bundle": {
