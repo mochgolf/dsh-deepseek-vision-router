@@ -27,12 +27,18 @@ DSH 图片附件 -> 视觉模型描述 -> deepseek-official
 dsh plugin --profile web add github:mochgolf/dsh-deepseek-vision-router
 ```
 
-通过 DSH 凭据服务或启动环境提供视觉模型密钥：
+首次启动 DSH 后，通过其持久凭据服务录入一次视觉模型密钥：
 
 ```sh
-export VISION_OPENAI_API_KEY='your-key'
 dsh --profile web --host 127.0.0.1 --port 3080
+read -rsp '视觉模型 API Key: ' key; echo
+printf %s "$key" | dsh plugin --profile web exec dsh-vision-key
+unset key
 ```
+
+该命令会把 `VISION_OPENAI_API_KEY` 写入 DSH 管理的凭据库，而不是插件配置。
+以后启动无需再传环境变量。若 DSH 使用其他回环地址，请把地址作为命令的最后一个
+参数；同名启动环境变量仍可作为无头部署的后备方案。
 
 插件默认使用 OpenCode Go 的 `mimo-v2.5`。如需接入其他兼容 OpenAI 协议的
 视觉端点，可在插件的 Cordis 配置项中覆盖 `visionBaseURL`、`visionModel`、
@@ -43,7 +49,7 @@ dsh --profile web --host 127.0.0.1 --port 3080
 
 ## 安全与隐私
 
-- 凭据按引用解析，不会保存在插件配置中。
+- 凭据按引用解析、由 DSH 持久化，不会保存在插件配置中。
 - 图片字节会发送到配置的视觉模型提供方；DeepSeek 接收的是文字描述，而非像素。
 - 视觉描述在交给 DeepSeek 前会标记为不可信图片内容，避免图片中的文字被提升为
   系统指令。
