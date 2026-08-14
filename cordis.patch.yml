@@ -1,0 +1,12 @@
+# Installed as a separate provider; it does not replace deepseek-official.
+- insert:
+    - id: llm-deepseek-vision-router
+      name: dsh-deepseek-vision-router
+      config:
+        provider: deepseek-vision
+        targetProvider: deepseek-official
+        visionBaseURL: 'https://opencode.ai/zen/go/v1'
+        visionModel: 'mimo-v2.5'
+        visionApiKeyEnv: VISION_OPENAI_API_KEY
+        visionMaxTokens: 4096
+        visionTimeoutMs: 120000
