@@ -1,5 +1,7 @@
 # dsh-deepseek-vision-router
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 An experimental [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 plugin that lets a text-only DeepSeek main agent accept images directly from
 the DSH chat composer.

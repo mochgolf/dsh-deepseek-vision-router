@@ -9,10 +9,14 @@
   "homepage": "https://github.com/mochgolf/dsh-deepseek-vision-router#readme",
   "bugs": "https://github.com/mochgolf/dsh-deepseek-vision-router/issues",
   "keywords": [
+    "ai-agents",
+    "cordis",
     "deepseek",
+    "deepseek-harness",
     "dsh",
-    "vision",
-    "multimodal"
+    "dsh-plugin",
+    "multimodal",
+    "vision"
   ],
   "type": "module",
   "main": "index.js",
