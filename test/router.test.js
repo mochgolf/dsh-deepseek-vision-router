@@ -62,7 +62,19 @@ test('images use the selected DSH vision model before delegation', async () => {
   const options = {
     provider: 'deepseek-vision',
     model: 'deepseek-v4-pro',
-    messages: [{ id: 'message:test', role: 'user', source: { kind: 'user' }, content: [image] }],
+    messages: [
+      { id: 'message:test', role: 'user', source: { kind: 'user' }, content: [image] },
+      {
+        id: 'message:tool-result',
+        role: 'user',
+        source: { kind: 'tool', callId: 'call:image' },
+        content: [{
+          type: 'tool-result',
+          toolCallId: 'call:image',
+          content: [{ type: 'text', text: 'image metadata' }, image],
+        }],
+      },
+    ],
   }
 
   for await (const _chunk of adapter.stream(options)) {}
@@ -80,6 +92,8 @@ test('images use the selected DSH vision model before delegation', async () => {
   assert.equal(delegated[0].messages[0].content.some((block) => block.type === 'image'), false)
   assert.match(delegated[0].messages[0].content[0].text, /Untrusted visual description/)
   assert.match(delegated[0].messages[0].content[0].text, /green square/)
+  assert.equal(delegated[0].messages[1].content[0].content.some((block) => block.type === 'image'), false)
+  assert.match(delegated[0].messages[1].content[0].content[1].text, /green square/)
   assert.match(delegated[2].messages[0].content[0].text, /blue circle/)
   assert.deepEqual((await adapter.resolveModel('deepseek-vision', 'deepseek-v4-pro')).inputModalities, ['text', 'image'])
   assert.equal(resolveConfig({}).visionModel, 'mimo-v2.5')
