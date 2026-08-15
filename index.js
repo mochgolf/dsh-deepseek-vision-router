@@ -1,6 +1,7 @@
 import {
   LlmAdapter,
   LlmError,
+  contentHasImage,
   createUserMessage,
   freezeMessage,
 } from '@deepseek-ai/dsh-llm'
@@ -175,21 +176,29 @@ export class DeepSeekVisionRouter extends LlmAdapter {
     return description
   }
 
-  async transformMessage(message, signal) {
-    const refs = message.content
+  async transformContent(content, signal) {
+    const refs = content
       .filter((block) => block.type === 'image')
       .map((block) => block.attachment)
-    if (refs.length === 0) return message
-
-    const description = await this.describe(refs, signal)
+    const description = refs.length === 0 ? undefined : await this.describe(refs, signal)
     let inserted = false
-    const content = message.content.flatMap((block) => {
-      if (block.type !== 'image') return [block]
-      if (inserted) return []
-      inserted = true
-      return [{ type: 'text', text: description }]
-    })
-    return freezeMessage({ ...message, content })
+    const transformed = []
+    for (const block of content) {
+      if (block.type === 'image') {
+        if (!inserted) transformed.push({ type: 'text', text: description })
+        inserted = true
+      } else if (block.type === 'tool-result') {
+        transformed.push({ ...block, content: await this.transformContent(block.content, signal) })
+      } else {
+        transformed.push(block)
+      }
+    }
+    return transformed
+  }
+
+  async transformMessage(message, signal) {
+    if (!contentHasImage(message.content)) return message
+    return freezeMessage({ ...message, content: await this.transformContent(message.content, signal) })
   }
 
   async *stream(options) {
